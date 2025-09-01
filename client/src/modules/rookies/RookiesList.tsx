@@ -6,7 +6,7 @@ interface Player {
   name: string
   team: string
   position: string
-  isRookie: boolean
+  isPlayer: boolean
   isBrownsStarter?: boolean
 }
 
@@ -28,7 +28,7 @@ export default function RookiesList() {
             <tr><th>Name</th><th>Team</th><th>Pos</th><th className="text-end">Actions</th></tr>
           </thead>
           <tbody>
-            {players.filter(p => p.isRookie).map(p => (
+            {players.filter(p => p.isPlayer).map(p => (
               <tr key={p.id}>
                 <td>
                   <Link to={`/rookies/${p.id}`}>{p.name}</Link>

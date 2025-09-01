@@ -56,14 +56,14 @@ async function ensureSamplePlayer() {
     colleges: ['Ohio State'],
     draftYear: 2025,
     draftPick: 18,
-    isRookie: true,
+    isPlayer: true,
     isBrownsStarter: false,
     notes: 'Explosive slot receiver.'
   };
   await dbAsync.run(
     `INSERT INTO players (id, name, team, position, colleges, draftYear, draftPick, isRookie, isBrownsStarter, notes)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [player.id, player.name, player.team, player.position, JSON.stringify(player.colleges), player.draftYear, player.draftPick, player.isRookie ? 1 : 0, player.isBrownsStarter ? 1 : 0, player.notes ?? null]
+    [player.id, player.name, player.team, player.position, JSON.stringify(player.colleges), player.draftYear, player.draftPick, player.isPlayer ? 1 : 0, player.isBrownsStarter ? 1 : 0, player.notes ?? null]
   );
 }
 
@@ -80,6 +80,11 @@ function parseRow<T = any>(row: any): T {
   if ('statLines' in row && typeof row.statLines === 'string') row.statLines = JSON.parse(row.statLines);
   if ('data' in row && typeof (row as any).data === 'string') (row as any).values = JSON.parse((row as any).data);
   if ('slots' in row && typeof row.slots === 'string') row.slots = JSON.parse(row.slots);
+  // Map database isRookie to client isPlayer for backward compatibility
+  if ('isRookie' in row) {
+    row.isPlayer = Boolean(row.isRookie);
+    delete row.isRookie;
+  }
   return row as T;
 }
 
@@ -104,18 +109,28 @@ app.post('/api/players', async (req: Request, res: Response) => {
     colleges: z.array(z.string()),
     draftYear: z.number().optional(),
     draftPick: z.number().optional(),
-    isRookie: z.boolean(),
-    isBrownsStarter: z.boolean(),
+    isPlayer: z.union([z.boolean(), z.number(), z.string()]).transform(val => {
+      if (typeof val === 'boolean') return val
+      if (typeof val === 'number') return val !== 0
+      if (typeof val === 'string') return val === 'true' || val === '1'
+      return false
+    }),
+    isBrownsStarter: z.union([z.boolean(), z.number(), z.string()]).transform(val => {
+      if (typeof val === 'boolean') return val
+      if (typeof val === 'number') return val !== 0
+      if (typeof val === 'string') return val === 'true' || val === '1'
+      return false
+    }),
     notes: z.string().optional(),
   });
   const body = schema.parse(req.body);
   await dbAsync.run(
     `INSERT OR REPLACE INTO players (id, name, team, position, colleges, draftYear, draftPick, isRookie, isBrownsStarter, notes)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [body.id, body.name, body.team, body.position, JSON.stringify(body.colleges), body.draftYear ?? null, body.draftPick ?? null, body.isRookie ? 1 : 0, body.isBrownsStarter ? 1 : 0, body.notes ?? null]
+    [body.id, body.name, body.team, body.position, JSON.stringify(body.colleges), body.draftYear ?? null, body.draftPick ?? null, body.isPlayer ? 1 : 0, body.isBrownsStarter ? 1 : 0, body.notes ?? null]
   );
-  // If rookie, ensure binder page exists and enforce max 32 rookie pages
-  if (body.isRookie) {
+  // If player, ensure binder page exists and enforce max 32 player pages
+  if (body.isPlayer) {
     const existing = await dbAsync.get('SELECT id FROM binderPages WHERE playerId=?', [body.id]);
     if (!existing) {
       const count = await dbAsync.get<{ c: number }>('SELECT COUNT(1) as c FROM binderPages WHERE type="Rookie"');

@@ -11,7 +11,7 @@ export interface Player {
   colleges: string[];
   draftYear?: number;
   draftPick?: number;
-  isRookie: boolean;
+  isPlayer: boolean;
   isBrownsStarter: boolean;
   notes?: string;
 }

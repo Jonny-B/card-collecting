@@ -108,7 +108,18 @@ export default function TemplateEditor() {
                     <option value="calc">calc</option>
                   </select>
                 </div>
-                <div className="col-2"><input placeholder="Formula" className="form-control" value={s.formula ?? ''} onChange={e => updateLine(idx, { formula: e.target.value })} disabled={s.type !== 'calc'} /></div>
+                <div className="col-2">
+                  <input
+                    className={`form-control ${s.type !== 'calc' ? 'bg-light' : ''}`}
+                    placeholder={s.type !== 'calc' ? 'Set Type to Calculated' : 'e.g. REC / TGT * 100'}
+                    value={s.formula ?? ''}
+                    onChange={e => updateLine(idx, { formula: e.target.value })}
+                    readOnly={s.type !== 'calc'}
+                    title={s.type !== 'calc' ? 'Formula is only editable when Type is Calculated' : 'Enter a formula using other stat keys'}
+                    onClick={() => { if (s.type !== 'calc') alert('To edit Formula, change Type to Calculated.'); }}
+                    style={s.type !== 'calc' ? { cursor: 'not-allowed' } as React.CSSProperties : undefined}
+                  />
+                </div>
                 <div className="col-2">
                   <button className="btn btn-sm btn-outline-secondary w-100" onClick={() => openDesc(idx)} title={s.description ? 'Edit description' : 'Add description'}>
                     <i className={"fa " + (s.description ? 'fa-file-lines me-2' : 'fa-file-circle-plus me-2')} />
@@ -131,7 +142,19 @@ export default function TemplateEditor() {
       </div>
 
       {descOpen && (
-        <div className="modal fade show d-block" tabIndex={-1} role="dialog" aria-modal="true">
+        <div
+          className="modal fade show d-block"
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          style={{ zIndex: 1055 }}
+          onClick={(e) => {
+            // Only close if clicking the modal overlay itself, not the dialog
+            if (e.target === e.currentTarget) {
+              setDescOpen(false)
+            }
+          }}
+        >
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
@@ -147,7 +170,6 @@ export default function TemplateEditor() {
               </div>
             </div>
           </div>
-          <div className="modal-backdrop fade show" onClick={() => setDescOpen(false)} />
         </div>
       )}
     </div>

@@ -3,10 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 type Player = {
   id: string; name: string; team: string; position: string; colleges: string[];
-  draftYear?: number; draftPick?: number; isRookie: boolean; isBrownsStarter: boolean; notes?: string;
+  draftYear?: number; draftPick?: number; isPlayer: boolean; isBrownsStarter: boolean; notes?: string;
 }
 
-const empty: Player = { id: '', name: '', team: 'CLE', position: 'WR', colleges: [], isRookie: true, isBrownsStarter: false }
+const empty: Player = { id: '', name: '', team: 'CLE', position: 'WR', colleges: [], isPlayer: true, isBrownsStarter: false }
 
 export default function RookieEditor() {
   const { id } = useParams()
@@ -43,7 +43,7 @@ export default function RookieEditor() {
         </div>
         <div className="col-md-2 d-flex align-items-end">
           <div className="form-check">
-            <input id="rookie" className="form-check-input" type="checkbox" checked={p.isRookie} onChange={e => setP({ ...p, isRookie: e.target.checked })} />
+            <input id="rookie" className="form-check-input" type="checkbox" checked={p.isPlayer} onChange={e => setP({ ...p, isPlayer: e.target.checked })} />
             <label className="form-check-label" htmlFor="rookie">Rookie</label>
           </div>
         </div>
@@ -118,6 +118,11 @@ function TemplateSheets({ playerId }: { playerId: string }) {
     setSheets(ss => ss.filter(s => s.id !== id))
   }
 
+  const truncate = (text?: string, max = 60) => {
+    if (!text) return '—'
+    return text.length > max ? text.slice(0, max - 1) + '…' : text
+  }
+
   return (
     <div className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-2">
@@ -132,7 +137,7 @@ function TemplateSheets({ playerId }: { playerId: string }) {
         </div>
       </div>
 
-      {sheets.length === 0 && <div className="text-muted">No sheets yet. Select a template and season, then Add Sheet.</div>}
+  {sheets.length === 0 && <div className="text-muted">No sheets yet. Select a template and season, then Add Sheet.</div>}
 
       {sheets.map(s => {
         const tmpl = templates.find(t => t.id === s.templateId)
@@ -152,17 +157,18 @@ function TemplateSheets({ playerId }: { playerId: string }) {
             <div className="card-body">
               <div className="row g-2 text-muted small mb-1">
                 <div className="col-5">Stat</div>
-                <div className="col-7">Value</div>
+                <div className="col-4">Description</div>
+                <div className="col-3">Value</div>
               </div>
               {tmpl.statLines.sort((a,b) => a.order - b.order).map(sl => (
-                <div className="row g-2 align-items-center mb-1" key={sl.key} title={sl.description ?? ''}>
+                <div className="row g-2 align-items-center mb-1" key={sl.key}>
                   <div className="col-5">
-                    <label className="col-form-label col-form-label-sm">
-                      {sl.label}
-                      {sl.description ? <i className="fa fa-circle-info text-muted ms-1" title={sl.description} /> : null}
-                    </label>
+                    <label className="col-form-label col-form-label-sm">{sl.label}</label>
                   </div>
-                  <div className="col-7">
+                  <div className="col-4">
+                    <span className="text-muted" title={sl.description ?? ''}>{truncate(sl.description, 80)}</span>
+                  </div>
+                  <div className="col-3">
                     {sl.type === 'number' && (
                       <input type="number" className="form-control form-control-sm" value={(s.values[sl.key] as any) ?? ''} onChange={e => updateValue(s.id, sl.key, e.target.value)} title={sl.description ?? ''} />
                     )}
