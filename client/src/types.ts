@@ -25,6 +25,7 @@ export interface StatLineDef {
   formula?: string;
   perGame?: boolean;
   order: number;
+  description?: string;
 }
 
 export interface Template {

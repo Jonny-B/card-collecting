@@ -19,8 +19,8 @@ export default function RookiesList() {
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 className="h5 m-0">Rookies</h2>
-        <Link to="/rookies/new" className="btn btn-primary btn-sm"><i className="fa fa-plus me-2" />Add</Link>
+  <h2 className="h5 m-0">Players</h2>
+  <Link to="/rookies/new" className="btn btn-primary btn-sm"><i className="fa fa-plus me-2" />Add Player</Link>
       </div>
       <div className="table-responsive">
         <table className="table table-sm align-middle">

@@ -155,7 +155,8 @@ app.post('/api/templates', async (req: Request, res: Response) => {
       type: z.union([z.literal('number'), z.literal('text'), z.literal('calc')]),
       formula: z.string().optional(),
       perGame: z.boolean().optional(),
-      order: z.number()
+  order: z.number(),
+  description: z.string().optional()
     }))
   });
   const body = schema.parse(req.body);
@@ -195,14 +196,26 @@ app.post('/api/sheets', async (req: Request, res: Response) => {
   res.status(201).json({ ok: true });
 });
 
+// Get all sheets for a given player
+app.get('/api/players/:id/sheets', async (req: Request, res: Response) => {
+  const rows = await dbAsync.all('SELECT * FROM sheets WHERE playerId=?', [req.params.id]);
+  res.json(rows.map(parseRow<Sheet>));
+});
+
+// Delete a sheet by id
+app.delete('/api/sheets/:id', async (req: Request, res: Response) => {
+  await dbAsync.run('DELETE FROM sheets WHERE id=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
 // Stats endpoint for dashboard
 app.get('/api/stats', async (_req: Request, res: Response) => {
-  const [rookies, templates, binder] = await Promise.all([
-    dbAsync.get<{ c: number }>('SELECT COUNT(1) as c FROM players WHERE isRookie=1'),
+  const [players, templates, binder] = await Promise.all([
+    dbAsync.get<{ c: number }>('SELECT COUNT(1) as c FROM players'),
     dbAsync.get<{ c: number }>('SELECT COUNT(1) as c FROM templates'),
     dbAsync.get<{ c: number }>('SELECT COUNT(1) as c FROM binderPages'),
   ]);
-  res.json({ rookies: rookies?.c ?? 0, templates: templates?.c ?? 0, binderPages: binder?.c ?? 0 });
+  res.json({ players: players?.c ?? 0, templates: templates?.c ?? 0, binderPages: binder?.c ?? 0 });
 });
 
 // Binder pages

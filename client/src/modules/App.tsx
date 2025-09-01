@@ -8,7 +8,7 @@ export default function App() {
         <h1 className="h4 m-0">Football Card Binder</h1>
         <nav className="nav gap-3">
           <NavLink to="/" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Dashboard</NavLink>
-          <NavLink to="/rookies" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Rookies</NavLink>
+          <NavLink to="/rookies" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Players</NavLink>
           <NavLink to="/templates" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Templates</NavLink>
           <NavLink to="/browns" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Browns</NavLink>
           <NavLink to="/binder" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Binder</NavLink>

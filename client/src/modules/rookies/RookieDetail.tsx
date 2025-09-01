@@ -12,7 +12,7 @@ export default function RookieDetail() {
   return (
     <div className="print-page">
       <div className="d-flex justify-content-between align-items-center mb-3 no-print">
-        <h2 className="h5 m-0">Rookie Detail: {player.name}</h2>
+  <h2 className="h5 m-0">Player Detail: {player.name}</h2>
         <div className="btn-group">
           <button className="btn btn-outline-secondary btn-sm" onClick={() => window.print()}>
             <i className="fa fa-print me-2"/>Print Overview
@@ -23,7 +23,7 @@ export default function RookieDetail() {
       </div>
       <div className="print-header">
         <div className="print-date float-end">{new Date().toLocaleDateString()}</div>
-        <div className="print-title">Rookie Overview</div>
+  <div className="print-title">Player Overview</div>
         <div className="print-subtitle">{player.name} • {player.team} • {player.position}</div>
       </div>
       <div className="card">
