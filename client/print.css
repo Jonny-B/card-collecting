@@ -1,0 +1,5 @@
+/* Dedicated print stylesheet: US Letter defaults; use A4 via @page override in components if needed */
+@media print {
+  @page { size: Letter portrait; margin: 0.6in; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

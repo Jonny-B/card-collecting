@@ -1,0 +1,20 @@
+/* App-level styles and print helpers */
+body { background: #f7f7f9; }
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+}
+
+/* Print CSS per requirements */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  .print-page { font-family: Arial, Helvetica, sans-serif; color: #000; }
+  .print-page .print-header { text-align: center; margin-bottom: 8mm; }
+  .print-page .print-title { font-size: 16pt; font-weight: 700; }
+  .print-page .print-subtitle { font-size: 10pt; font-style: italic; }
+  .print-page .print-date { text-align: right; font-size: 11pt; }
+  .print-table th { background: #eee; font-weight: 700; }
+  .print-table th, .print-table td { border: 0.5pt solid #999; padding: 2mm 3mm; }
+  .print-table td.num { text-align: right; }
+  .print-footer { font-size: 9pt; display: flex; justify-content: space-between; margin-top: 6mm; }
+}
