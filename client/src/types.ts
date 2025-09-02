@@ -59,9 +59,19 @@ export interface Game {
 
 export type BinderPageType = 'Rookie' | 'Browns' | 'Extra';
 
+export interface Binder {
+  id: string;
+  name: string;
+  year?: number;
+  pageCount?: number;
+  pageSize?: number;
+  coverUrl?: string;
+}
+
 export interface BinderPage {
   id: string;
   type: BinderPageType | string;
+  binderId?: string;
   playerId?: string;
   slots: Array<{ index: number; note?: string }>;
 }

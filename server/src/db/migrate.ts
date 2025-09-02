@@ -63,11 +63,84 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_games_date ON games(date);
   `);
 
+  // Teams table (for settings)
+  await dbAsync.exec(`
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      city TEXT,
+      colorPrimary TEXT,
+      colorSecondary TEXT,
+      logoUrl TEXT,
+      conference TEXT,
+      division TEXT
+    );
+  `);
+
+  // Binder Page Templates table
+  await dbAsync.exec(`
+    CREATE TABLE IF NOT EXISTS binderPageTemplates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      rows INTEGER NOT NULL,
+      cols INTEGER NOT NULL,
+      orientation TEXT NOT NULL,
+      unit TEXT NOT NULL,
+      slotWidth REAL NOT NULL,
+      slotHeight REAL NOT NULL,
+      marginTop REAL,
+      marginRight REAL,
+      marginBottom REAL,
+      marginLeft REAL,
+      gutterX REAL,
+      gutterY REAL
+    );
+  `);
+
+  // New: Binders table
+  await dbAsync.exec(`
+    CREATE TABLE IF NOT EXISTS binders (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      year INTEGER,
+      pageCount INTEGER,
+      pageSize INTEGER,
+      coverUrl TEXT
+    );
+  `);
+
   // Add players.templateId column if it does not exist
   try {
     await dbAsync.exec(`ALTER TABLE players ADD COLUMN templateId TEXT`);
   } catch {
     // ignore if exists
+  }
+
+  // Add players.photoUrl column if it does not exist
+  try {
+    await dbAsync.exec(`ALTER TABLE players ADD COLUMN photoUrl TEXT`);
+  } catch {
+    // ignore if exists
+  }
+
+  // Add binderPages.binderId column if it does not exist
+  try {
+    await dbAsync.exec(`ALTER TABLE binderPages ADD COLUMN binderId TEXT`);
+  } catch {
+    // ignore if exists
+  }
+
+  // Data fix: ensure a default binder exists and attach any pages lacking binderId
+  try {
+    const existing = await dbAsync.get<{ id: string }>(`SELECT id FROM binders WHERE id='default-binder'`);
+    if (!existing) {
+      await dbAsync.run(`INSERT INTO binders (id, name, year, pageCount, pageSize, coverUrl) VALUES (?,?,?,?,?,?)`, ['default-binder', 'My Binder', null, null, 9, null]);
+    }
+    await dbAsync.run(`UPDATE binderPages SET binderId='default-binder' WHERE binderId IS NULL OR binderId=''`);
+  } catch {
+    // ignore any issues; best-effort migration
   }
 }
 // Allow running directly

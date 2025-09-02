@@ -15,6 +15,7 @@ export interface Player {
   isBrownsStarter: boolean;
   notes?: string;
   templateId?: string; // New: assign a template to the player
+  photoUrl?: string;
 }
 
 export type StatType = 'number' | 'text' | 'calc';
@@ -59,9 +60,49 @@ export interface Game {
 
 export type BinderPageType = 'Rookie' | 'Browns' | 'Extra';
 
+export interface Binder {
+  id: string;
+  name: string;
+  year?: number;
+  pageCount?: number;
+  pageSize?: number; // slots per page, e.g., 9
+  coverUrl?: string;
+}
+
 export interface BinderPage {
   id: string;
   type: BinderPageType;
+  binderId?: string;
   playerId?: string;
   slots: Array<{ index: number; note?: string }>;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  code: string;
+  city?: string;
+  colorPrimary?: string;
+  colorSecondary?: string;
+  logoUrl?: string;
+  conference?: string;
+  division?: string;
+}
+
+export interface BinderPageTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  rows: number;
+  cols: number;
+  orientation: 'portrait' | 'landscape';
+  unit: 'in' | 'mm';
+  slotWidth: number;
+  slotHeight: number;
+  marginTop?: number;
+  marginRight?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  gutterX?: number;
+  gutterY?: number;
 }

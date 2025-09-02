@@ -3,7 +3,7 @@ import cors from 'cors';
 import { dbAsync } from './db/connection.ts';
 import { migrate } from './db/migrate.ts';
 import { z } from 'zod';
-import { Player, Template, Sheet, BinderPage, Game } from './types.ts';
+import { Player, Template, Sheet, BinderPage, Game, Binder, Team, BinderPageTemplate } from './types.ts';
 import { TEAMS, POSITIONS } from './data/meta.ts';
 import fs from 'fs';
 import path from 'path';
@@ -14,7 +14,8 @@ await migrate();
 const UPLOAD_ROOT = path.resolve(process.cwd(), 'server', 'uploads');
 const TEAM_DIR = path.join(UPLOAD_ROOT, 'teams');
 const PLAYER_DIR = path.join(UPLOAD_ROOT, 'players');
-for (const dir of [UPLOAD_ROOT, TEAM_DIR, PLAYER_DIR]) {
+const BINDER_DIR = path.join(UPLOAD_ROOT, 'binders');
+for (const dir of [UPLOAD_ROOT, TEAM_DIR, PLAYER_DIR, BINDER_DIR]) {
   try { fs.mkdirSync(dir, { recursive: true }); } catch {}
 }
 
@@ -258,6 +259,23 @@ app.post('/api/upload/playerPhoto', async (req: Request, res: Response) => {
   }
 });
 
+app.post('/api/upload/binderCover', async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({ binderId: z.string(), image: z.string() });
+    const { binderId, image } = schema.parse(req.body);
+    const { buffer, ext } = dataUrlToBuffer(image);
+    for (const e of ['png', 'jpg', 'jpeg', 'webp']) {
+      const p = path.join(BINDER_DIR, `${binderId}.${e}`);
+      try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
+    }
+    const filename = `${binderId}.${ext}`;
+    fs.writeFileSync(path.join(BINDER_DIR, filename), buffer);
+    res.status(201).json({ ok: true, url: `/uploads/binders/${filename}` });
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message || 'Upload failed' });
+  }
+});
+
 // Players
 app.get('/api/players', async (_req: Request, res: Response) => {
   const rows = await dbAsync.all('SELECT * FROM players');
@@ -296,12 +314,13 @@ app.post('/api/players', async (req: Request, res: Response) => {
     }),
     notes: z.string().optional(),
     templateId: z.string().optional(),
+    photoUrl: z.string().optional(),
   });
   const body = schema.parse(req.body);
   await dbAsync.run(
-    `INSERT OR REPLACE INTO players (id, name, team, position, colleges, draftYear, draftPick, isRookie, isBrownsStarter, notes, templateId)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [body.id, body.name, body.team, body.position, JSON.stringify(body.colleges), body.draftYear ?? null, body.draftPick ?? null, body.isPlayer ? 1 : 0, body.isBrownsStarter ? 1 : 0, body.notes ?? null, body.templateId ?? null]
+    `INSERT OR REPLACE INTO players (id, name, team, position, colleges, draftYear, draftPick, isRookie, isBrownsStarter, notes, templateId, photoUrl)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [body.id, body.name, body.team, body.position, JSON.stringify(body.colleges), body.draftYear ?? null, body.draftPick ?? null, body.isPlayer ? 1 : 0, body.isBrownsStarter ? 1 : 0, body.notes ?? null, body.templateId ?? null, body.photoUrl ?? null]
   );
   // If player, ensure binder page exists and enforce max 32 player pages
   if (body.isPlayer) {
@@ -311,9 +330,10 @@ app.post('/api/players', async (req: Request, res: Response) => {
       if ((count?.c ?? 0) >= 32) {
         return res.status(400).json({ error: 'Rookie page limit (32) reached' });
       }
-      const binderId = `bp-${body.id}`;
-      const slots = Array.from({ length: 9 }, (_, i) => ({ index: i + 1 }));
-      await dbAsync.run('INSERT OR REPLACE INTO binderPages (id, type, playerId, slots) VALUES (?,?,?,?)', [binderId, 'Rookie', body.id, JSON.stringify(slots)]);
+  const binderId = 'default-binder';
+  const pageId = `bp-${body.id}`;
+  const slots = Array.from({ length: 9 }, (_, i) => ({ index: i + 1 }));
+  await dbAsync.run('INSERT OR REPLACE INTO binderPages (id, type, binderId, playerId, slots) VALUES (?,?,?,?,?)', [pageId, 'Rookie', binderId, body.id, JSON.stringify(slots)]);
     }
   }
   res.status(201).json({ ok: true });
@@ -438,9 +458,45 @@ app.get('/api/stats', async (_req: Request, res: Response) => {
   res.json({ players: players?.c ?? 0, templates: templates?.c ?? 0, binderPages: binder?.c ?? 0 });
 });
 
+// Binders
+app.get('/api/binders', async (_req: Request, res: Response) => {
+  const rows = await dbAsync.all('SELECT * FROM binders');
+  res.json(rows.map(parseRow<Binder>));
+});
+
+app.get('/api/binders/:id', async (req: Request, res: Response) => {
+  const row = await dbAsync.get('SELECT * FROM binders WHERE id=?', [req.params.id]);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  res.json(parseRow<Binder>(row));
+});
+
+app.post('/api/binders', async (req: Request, res: Response) => {
+  const schema = z.object({
+    id: z.string(),
+    name: z.string(),
+    year: z.number().nullable().optional(),
+    pageCount: z.number().nullable().optional(),
+    pageSize: z.number().nullable().optional(),
+    coverUrl: z.string().nullable().optional(),
+  });
+  const body = schema.parse(req.body);
+  await dbAsync.run('INSERT OR REPLACE INTO binders (id, name, year, pageCount, pageSize, coverUrl) VALUES (?,?,?,?,?,?)', [body.id, body.name, body.year ?? null, body.pageCount ?? null, body.pageSize ?? null, body.coverUrl ?? null]);
+  res.status(201).json({ ok: true });
+});
+
+app.delete('/api/binders/:id', async (req: Request, res: Response) => {
+  const id = req.params.id;
+  await dbAsync.run('DELETE FROM binderPages WHERE binderId=?', [id]);
+  await dbAsync.run('DELETE FROM binders WHERE id=?', [id]);
+  res.json({ ok: true });
+});
+
 // Binder pages
-app.get('/api/binderPages', async (_req: Request, res: Response) => {
-  const rows = await dbAsync.all('SELECT * FROM binderPages');
+app.get('/api/binderPages', async (req: Request, res: Response) => {
+  const { binderId } = req.query as any;
+  const rows = binderId
+    ? await dbAsync.all('SELECT * FROM binderPages WHERE binderId=?', [binderId])
+    : await dbAsync.all('SELECT * FROM binderPages');
   res.json(rows.map(parseRow<BinderPage>));
 });
 
@@ -448,12 +504,113 @@ app.post('/api/binderPages', async (req: Request, res: Response) => {
   const schema = z.object({
     id: z.string(),
     type: z.string(),
+    binderId: z.string().optional(),
     playerId: z.string().optional(),
     slots: z.array(z.object({ index: z.number(), note: z.string().optional() }))
   });
   const body = schema.parse(req.body);
-  await dbAsync.run('INSERT OR REPLACE INTO binderPages (id, type, playerId, slots) VALUES (?,?,?,?)', [body.id, body.type, body.playerId ?? null, JSON.stringify(body.slots)]);
+  await dbAsync.run('INSERT OR REPLACE INTO binderPages (id, type, binderId, playerId, slots) VALUES (?,?,?,?,?)', [body.id, body.type, body.binderId ?? 'default-binder', body.playerId ?? null, JSON.stringify(body.slots)]);
   res.status(201).json({ ok: true });
+});
+
+app.delete('/api/binderPages/:id', async (req: Request, res: Response) => {
+  await dbAsync.run('DELETE FROM binderPages WHERE id=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Teams
+app.get('/api/teams', async (_req: Request, res: Response) => {
+  const rows = await dbAsync.all('SELECT * FROM teams ORDER BY name');
+  res.json(rows.map(parseRow<Team>));
+});
+
+app.post('/api/teams', async (req: Request, res: Response) => {
+  const schema = z.object({
+    id: z.string().optional(),
+    name: z.string(),
+    code: z.string(),
+    city: z.string().optional(),
+    colorPrimary: z.string().optional(),
+    colorSecondary: z.string().optional(),
+    logoUrl: z.string().url().optional(),
+    conference: z.string().optional(),
+    division: z.string().optional(),
+  });
+  const t = schema.parse(req.body);
+  const id = t.id || `team-${Date.now()}`;
+  await dbAsync.run(
+    `INSERT OR REPLACE INTO teams (id, name, code, city, colorPrimary, colorSecondary, logoUrl, conference, division)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [id, t.name, t.code, t.city ?? null, t.colorPrimary ?? null, t.colorSecondary ?? null, t.logoUrl ?? null, t.conference ?? null, t.division ?? null]
+  );
+  res.status(201).json({ ok: true, id });
+});
+
+app.put('/api/teams/:id', async (req: Request, res: Response) => {
+  const id = req.params.id;
+  const schema = z.object({
+    name: z.string(), code: z.string(), city: z.string().optional(), colorPrimary: z.string().optional(), colorSecondary: z.string().optional(), logoUrl: z.string().url().optional(), conference: z.string().optional(), division: z.string().optional(),
+  });
+  const t = schema.parse(req.body);
+  await dbAsync.run(`UPDATE teams SET name=?, code=?, city=?, colorPrimary=?, colorSecondary=?, logoUrl=?, conference=?, division=? WHERE id=?`, [t.name, t.code, t.city ?? null, t.colorPrimary ?? null, t.colorSecondary ?? null, t.logoUrl ?? null, t.conference ?? null, t.division ?? null, id]);
+  res.json({ ok: true });
+});
+
+app.delete('/api/teams/:id', async (req: Request, res: Response) => {
+  await dbAsync.run('DELETE FROM teams WHERE id=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Binder Page Templates
+app.get('/api/binderPageTemplates', async (_req: Request, res: Response) => {
+  const rows = await dbAsync.all('SELECT * FROM binderPageTemplates ORDER BY name');
+  res.json(rows.map(parseRow<BinderPageTemplate>));
+});
+
+app.post('/api/binderPageTemplates', async (req: Request, res: Response) => {
+  const schema = z.object({
+    id: z.string().optional(),
+    name: z.string(),
+    description: z.string().optional(),
+    rows: z.number().int().min(1),
+    cols: z.number().int().min(1),
+    orientation: z.union([z.literal('portrait'), z.literal('landscape')]),
+    unit: z.union([z.literal('in'), z.literal('mm')]),
+    slotWidth: z.number().positive(),
+    slotHeight: z.number().positive(),
+    marginTop: z.number().nonnegative().optional(),
+    marginRight: z.number().nonnegative().optional(),
+    marginBottom: z.number().nonnegative().optional(),
+    marginLeft: z.number().nonnegative().optional(),
+    gutterX: z.number().nonnegative().optional(),
+    gutterY: z.number().nonnegative().optional(),
+  });
+  const body = schema.parse(req.body);
+  const id = body.id || `bpt-${Date.now()}`;
+  await dbAsync.run(
+    `INSERT OR REPLACE INTO binderPageTemplates (id, name, description, rows, cols, orientation, unit, slotWidth, slotHeight, marginTop, marginRight, marginBottom, marginLeft, gutterX, gutterY)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, body.name, body.description ?? null, body.rows, body.cols, body.orientation, body.unit, body.slotWidth, body.slotHeight, body.marginTop ?? null, body.marginRight ?? null, body.marginBottom ?? null, body.marginLeft ?? null, body.gutterX ?? null, body.gutterY ?? null]
+  );
+  res.status(201).json({ ok: true, id });
+});
+
+app.put('/api/binderPageTemplates/:id', async (req: Request, res: Response) => {
+  const id = req.params.id;
+  const schema = z.object({
+    name: z.string(), description: z.string().optional(), rows: z.number().int().min(1), cols: z.number().int().min(1), orientation: z.union([z.literal('portrait'), z.literal('landscape')]), unit: z.union([z.literal('in'), z.literal('mm')]), slotWidth: z.number().positive(), slotHeight: z.number().positive(), marginTop: z.number().nonnegative().optional(), marginRight: z.number().nonnegative().optional(), marginBottom: z.number().nonnegative().optional(), marginLeft: z.number().nonnegative().optional(), gutterX: z.number().nonnegative().optional(), gutterY: z.number().nonnegative().optional(),
+  });
+  const body = schema.parse(req.body);
+  await dbAsync.run(
+    `UPDATE binderPageTemplates SET name=?, description=?, rows=?, cols=?, orientation=?, unit=?, slotWidth=?, slotHeight=?, marginTop=?, marginRight=?, marginBottom=?, marginLeft=?, gutterX=?, gutterY=? WHERE id=?`,
+    [body.name, body.description ?? null, body.rows, body.cols, body.orientation, body.unit, body.slotWidth, body.slotHeight, body.marginTop ?? null, body.marginRight ?? null, body.marginBottom ?? null, body.marginLeft ?? null, body.gutterX ?? null, body.gutterY ?? null, id]
+  );
+  res.json({ ok: true });
+});
+
+app.delete('/api/binderPageTemplates/:id', async (req: Request, res: Response) => {
+  await dbAsync.run('DELETE FROM binderPageTemplates WHERE id=?', [req.params.id]);
+  res.json({ ok: true });
 });
 
 // Admin seed: 2025 Round 1 draft

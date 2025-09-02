@@ -9,7 +9,6 @@ export default function App() {
         <nav className="nav gap-3">
           <NavLink to="/" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Dashboard</NavLink>
           <NavLink to="/rookies" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Players</NavLink>
-          <NavLink to="/templates" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Templates</NavLink>
           <NavLink to="/browns" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Browns</NavLink>
           <NavLink to="/binder" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Binder</NavLink>
           <NavLink to="/settings" className={({isActive}) => 'nav-link' + (isActive ? ' fw-bold' : '')}>Settings</NavLink>

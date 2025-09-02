@@ -96,6 +96,11 @@ export default function RookieEditor() {
           <label className="form-label">Notes</label>
           <textarea className="form-control" rows={3} value={p.notes ?? ''} onChange={e => setP({ ...p, notes: e.target.value })} />
         </div>
+        <div className="col-12">
+          <label className="form-label">Photo URL</label>
+          <input className="form-control" placeholder="https://example.com/player-photo.jpg" value={p.photoUrl ?? ''} onChange={e => setP({ ...p, photoUrl: e.target.value || undefined })} />
+          <div className="form-text">Enter a direct link to the player's photo image</div>
+        </div>
         <div className="col-md-6">
           <label className="form-label">Assigned Template</label>
           <select className="form-select" value={p.templateId ?? ''} onChange={e => setP({ ...p, templateId: e.target.value || undefined })}>
