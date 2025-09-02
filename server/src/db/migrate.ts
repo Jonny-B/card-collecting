@@ -28,7 +28,7 @@ export async function migrate() {
       playerId TEXT NOT NULL,
       templateId TEXT NOT NULL,
       seasonYear INTEGER NOT NULL,
-  data TEXT NOT NULL,
+      data TEXT NOT NULL,
       FOREIGN KEY(playerId) REFERENCES players(id),
       FOREIGN KEY(templateId) REFERENCES templates(id)
     );
@@ -43,7 +43,32 @@ export async function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_sheets_player ON sheets(playerId);
     CREATE INDEX IF NOT EXISTS idx_sheets_template ON sheets(templateId);
+
+    -- New per-game stats table
+    CREATE TABLE IF NOT EXISTS games (
+      id TEXT PRIMARY KEY,
+      playerId TEXT NOT NULL,
+      templateId TEXT NOT NULL,
+      date TEXT,
+      isBye INTEGER NOT NULL,
+      opponentAbbr TEXT,
+      teamScore INTEGER,
+      oppScore INTEGER,
+      data TEXT NOT NULL,
+      FOREIGN KEY(playerId) REFERENCES players(id),
+      FOREIGN KEY(templateId) REFERENCES templates(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_games_player ON games(playerId);
+    CREATE INDEX IF NOT EXISTS idx_games_date ON games(date);
   `);
+
+  // Add players.templateId column if it does not exist
+  try {
+    await dbAsync.exec(`ALTER TABLE players ADD COLUMN templateId TEXT`);
+  } catch {
+    // ignore if exists
+  }
 }
 // Allow running directly
 const isDirect = process.argv[1] && process.argv[1].includes('migrate.ts');

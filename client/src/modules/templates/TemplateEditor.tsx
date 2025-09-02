@@ -121,7 +121,7 @@ export default function TemplateEditor() {
                   />
                 </div>
                 <div className="col-2">
-                  <button className="btn btn-sm btn-outline-secondary w-100" onClick={() => openDesc(idx)} title={s.description ? 'Edit description' : 'Add description'}>
+                  <button className="btn btn-sm btn-outline-secondary w-100" onClick={() => openDesc(idx)} title={s.description && s.description.trim() ? s.description : 'Add description'}>
                     <i className={"fa " + (s.description ? 'fa-file-lines me-2' : 'fa-file-circle-plus me-2')} />
                     {s.description ? 'Edit' : 'Add'}
                   </button>

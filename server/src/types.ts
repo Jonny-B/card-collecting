@@ -14,6 +14,7 @@ export interface Player {
   isPlayer: boolean;
   isBrownsStarter: boolean;
   notes?: string;
+  templateId?: string; // New: assign a template to the player
 }
 
 export type StatType = 'number' | 'text' | 'calc';
@@ -40,6 +41,19 @@ export interface Sheet {
   playerId: string;
   templateId: string;
   seasonYear: number;
+  values: Record<string, number | string>;
+}
+
+// New: per-game stats captured when viewing a player
+export interface Game {
+  id: string;
+  playerId: string;
+  templateId: string;
+  date?: string; // ISO date string (YYYY-MM-DD)
+  isBye: boolean;
+  opponentAbbr?: string;
+  teamScore?: number;
+  oppScore?: number;
   values: Record<string, number | string>;
 }
 

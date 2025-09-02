@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 type Player = {
   id: string; name: string; team: string; position: string; colleges: string[];
-  draftYear?: number; draftPick?: number; isPlayer: boolean; isBrownsStarter: boolean; notes?: string;
+  draftYear?: number; draftPick?: number; isPlayer: boolean; isBrownsStarter: boolean; notes?: string; templateId?: string; photoUrl?: string;
 }
+
+type Template = { id: string; name: string; position: string; statLines: any[] }
 
 const empty: Player = { id: '', name: '', team: 'CLE', position: 'WR', colleges: [], isPlayer: true, isBrownsStarter: false }
 
@@ -13,16 +15,37 @@ export default function RookieEditor() {
   const isNew = id === 'new'
   const nav = useNavigate()
   const [p, setP] = useState<Player>(empty)
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [teams, setTeams] = useState<{ abbr: string; name: string }[]>([])
+  const [positions, setPositions] = useState<{ abbr: string; name: string }[]>([])
 
   useEffect(() => {
     if (!isNew && id) fetch(`/api/players/${id}`).then(r => r.json()).then(setP)
   }, [id, isNew])
+  useEffect(() => { fetch('/api/templates').then(r => r.json()).then(setTemplates) }, [])
+  useEffect(() => { fetch('/api/meta/teams').then(r => r.json()).then(setTeams) }, [])
+  useEffect(() => { fetch('/api/meta/positions').then(r => r.json()).then(setPositions) }, [])
 
   const save = async () => {
     if (!p.name.trim()) return alert('Name required')
     const body = { ...p, id: p.id || crypto.randomUUID() }
     await fetch('/api/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     nav('/rookies')
+  }
+
+  const onUploadPhoto = async (file: File) => {
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const image = String(reader.result)
+      await fetch('/api/upload/playerPhoto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: p.id || 'new-player', image }) })
+      // if new player, we won’t have id yet; advise to save first
+      if (!p.id) alert('Save player first to persist photo. Photo stored server-side once player is created.')
+      else {
+        const refreshed = await fetch(`/api/players/${p.id}`).then(r => r.json())
+        setP(refreshed)
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -35,11 +58,15 @@ export default function RookieEditor() {
         </div>
         <div className="col-md-2">
           <label className="form-label">Team</label>
-          <input className="form-control" value={p.team} onChange={e => setP({ ...p, team: e.target.value })} />
+          <select className="form-select" value={p.team} onChange={e => setP({ ...p, team: e.target.value })}>
+            {teams.map(t => <option key={t.abbr} value={t.abbr}>{t.abbr} — {t.name}</option>)}
+          </select>
         </div>
         <div className="col-md-2">
           <label className="form-label">Position</label>
-          <input className="form-control" value={p.position} onChange={e => setP({ ...p, position: e.target.value })} />
+          <select className="form-select" value={p.position} onChange={e => setP({ ...p, position: e.target.value })}>
+            {positions.map(pos => <option key={pos.abbr} value={pos.abbr}>{pos.abbr} — {pos.name}</option>)}
+          </select>
         </div>
         <div className="col-md-2 d-flex align-items-end">
           <div className="form-check">
@@ -69,122 +96,34 @@ export default function RookieEditor() {
           <label className="form-label">Notes</label>
           <textarea className="form-control" rows={3} value={p.notes ?? ''} onChange={e => setP({ ...p, notes: e.target.value })} />
         </div>
+        <div className="col-md-6">
+          <label className="form-label">Assigned Template</label>
+          <select className="form-select" value={p.templateId ?? ''} onChange={e => setP({ ...p, templateId: e.target.value || undefined })}>
+            <option value="">None</option>
+            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <div className="form-text">Pick a template now; you will fill stats when viewing the player each week.</div>
+        </div>
+        <div className="col-md-6">
+          <label className="form-label">Player Photo</label>
+          <div className="d-flex align-items-center gap-3">
+            <div style={{ width: 80, height: 80, background: '#f3f3f3' }} className="d-flex align-items-center justify-content-center rounded overflow-hidden">
+              {p.photoUrl ? <img src={p.photoUrl} alt="Player" style={{ maxWidth: '100%', maxHeight: '100%' }} /> : <span className="text-muted small">No photo</span>}
+            </div>
+            <label className="btn btn-outline-secondary mb-0">
+              <i className="fa fa-upload me-2" />Upload
+              <input type="file" accept="image/*" hidden onChange={e => e.target.files && onUploadPhoto(e.target.files[0])} />
+            </label>
+          </div>
+          <div className="form-text">Upload a square image for best results.</div>
+        </div>
       </div>
       <div className="mt-3 d-flex gap-2">
         <button className="btn btn-primary" onClick={save}><i className="fa fa-save me-2"/>Save</button>
       </div>
       <div className="text-muted mt-2">Saving a rookie will auto-create a binder page (max 32 rookies enforced).</div>
 
-      <TemplateSheets playerId={p.id} />
-    </div>
-  )
-}
-
-type StatLineDef = { key: string; label: string; type: 'number' | 'text' | 'calc'; formula?: string; perGame?: boolean; order: number; description?: string }
-type Template = { id: string; name: string; position: string; statLines: StatLineDef[] }
-type Sheet = { id: string; playerId: string; templateId: string; seasonYear: number; values: Record<string,string|number> }
-
-function TemplateSheets({ playerId }: { playerId: string }) {
-  const [templates, setTemplates] = useState<Template[]>([])
-  const [sheets, setSheets] = useState<Sheet[]>([])
-  const [season, setSeason] = useState<number>(new Date().getFullYear())
-  const [activeTmpl, setActiveTmpl] = useState<string>('')
-
-  useEffect(() => { fetch('/api/templates').then(r => r.json()).then(setTemplates) }, [])
-  useEffect(() => { if (playerId) fetch(`/api/players/${playerId}/sheets`).then(r => r.json()).then(setSheets) }, [playerId])
-
-  const addSheet = async () => {
-    if (!playerId) return alert('Save the player first')
-    if (!activeTmpl) return alert('Choose a template')
-    const id = crypto.randomUUID()
-    const tmpl = templates.find(t => t.id === activeTmpl)!
-    const values: Record<string,string|number> = {}
-    tmpl.statLines.forEach(sl => { if (sl.type !== 'calc') values[sl.key] = '' })
-    const sheet: Sheet = { id, playerId, templateId: tmpl.id, seasonYear: season, values }
-    await fetch('/api/sheets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sheet) })
-    setSheets(s => [...s, sheet])
-  }
-
-  const updateValue = (sheetId: string, key: string, val: string) => {
-    setSheets(ss => ss.map(s => s.id === sheetId ? { ...s, values: { ...s.values, [key]: val } } : s))
-  }
-
-  const saveSheet = async (s: Sheet) => {
-    await fetch('/api/sheets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) })
-  }
-
-  const delSheet = async (id: string) => {
-    await fetch(`/api/sheets/${id}`, { method: 'DELETE' })
-    setSheets(ss => ss.filter(s => s.id !== id))
-  }
-
-  const truncate = (text?: string, max = 60) => {
-    if (!text) return '—'
-    return text.length > max ? text.slice(0, max - 1) + '…' : text
-  }
-
-  return (
-    <div className="mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <h3 className="h6 m-0">Templates & Stats</h3>
-        <div className="d-flex gap-2">
-          <select className="form-select form-select-sm" value={activeTmpl} onChange={e => setActiveTmpl(e.target.value)}>
-            <option value="">Choose template…</option>
-            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-          <input type="number" className="form-control form-control-sm" value={season} onChange={e => setSeason(Number(e.target.value))} />
-          <button className="btn btn-sm btn-outline-primary" onClick={addSheet}><i className="fa fa-plus me-2"/>Add Sheet</button>
-        </div>
-      </div>
-
-  {sheets.length === 0 && <div className="text-muted">No sheets yet. Select a template and season, then Add Sheet.</div>}
-
-      {sheets.map(s => {
-        const tmpl = templates.find(t => t.id === s.templateId)
-        if (!tmpl) return null
-        return (
-          <div className="card mb-3" key={s.id}>
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <div>
-                <strong>{tmpl.name}</strong>
-                <span className="ms-2 text-muted">Season {s.seasonYear}</span>
-              </div>
-              <div className="btn-group btn-group-sm">
-                <button className="btn btn-outline-primary" onClick={() => saveSheet(s)}><i className="fa fa-save me-1"/>Save Sheet</button>
-                <button className="btn btn-outline-danger" onClick={() => delSheet(s.id)}><i className="fa fa-trash me-1"/>Delete</button>
-              </div>
-            </div>
-            <div className="card-body">
-              <div className="row g-2 text-muted small mb-1">
-                <div className="col-5">Stat</div>
-                <div className="col-4">Description</div>
-                <div className="col-3">Value</div>
-              </div>
-              {tmpl.statLines.sort((a,b) => a.order - b.order).map(sl => (
-                <div className="row g-2 align-items-center mb-1" key={sl.key}>
-                  <div className="col-5">
-                    <label className="col-form-label col-form-label-sm">{sl.label}</label>
-                  </div>
-                  <div className="col-4">
-                    <span className="text-muted" title={sl.description ?? ''}>{truncate(sl.description, 80)}</span>
-                  </div>
-                  <div className="col-3">
-                    {sl.type === 'number' && (
-                      <input type="number" className="form-control form-control-sm" value={(s.values[sl.key] as any) ?? ''} onChange={e => updateValue(s.id, sl.key, e.target.value)} title={sl.description ?? ''} />
-                    )}
-                    {sl.type === 'text' && (
-                      <input className="form-control form-control-sm" value={(s.values[sl.key] as any) ?? ''} onChange={e => updateValue(s.id, sl.key, e.target.value)} title={sl.description ?? ''} />
-                    )}
-                    {sl.type === 'calc' && (
-                      <input className="form-control form-control-sm" value={String(s.values[sl.key] ?? '')} disabled title={sl.description ?? ''} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })}
+      {/* No per-week stat inputs here by design */}
     </div>
   )
 }

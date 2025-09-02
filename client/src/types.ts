@@ -14,6 +14,8 @@ export interface Player {
   isPlayer: boolean;
   isBrownsStarter: boolean;
   notes?: string;
+  templateId?: string;
+  photoUrl?: string;
 }
 
 export type StatType = 'number' | 'text' | 'calc';
@@ -43,6 +45,18 @@ export interface Sheet {
   values: Record<string, number | string>;
 }
 
+export interface Game {
+  id: string;
+  playerId: string;
+  templateId: string;
+  date?: string;
+  isBye: boolean;
+  opponentAbbr?: string;
+  teamScore?: number;
+  oppScore?: number;
+  values: Record<string, number | string>;
+}
+
 export type BinderPageType = 'Rookie' | 'Browns' | 'Extra';
 
 export interface BinderPage {
@@ -51,3 +65,6 @@ export interface BinderPage {
   playerId?: string;
   slots: Array<{ index: number; note?: string }>;
 }
+
+export type MetaTeam = { abbr: string; name: string; helmetUrl?: string };
+export type MetaPosition = { abbr: string; name: string };

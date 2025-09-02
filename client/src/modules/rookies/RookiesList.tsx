@@ -8,13 +8,20 @@ interface Player {
   position: string
   isPlayer: boolean
   isBrownsStarter?: boolean
+  photoUrl?: string
 }
+
+interface MetaTeam { abbr: string; name: string; helmetUrl?: string }
 
 export default function RookiesList() {
   const [players, setPlayers] = useState<Player[]>([])
+  const [teams, setTeams] = useState<MetaTeam[]>([])
   useEffect(() => {
     fetch('/api/players').then(r => r.json()).then(setPlayers)
+    fetch('/api/meta/teams').then(r => r.json()).then(setTeams)
   }, [])
+
+  const teamFor = (abbr: string) => teams.find(t => t.abbr === abbr)
 
   return (
     <div>
@@ -31,10 +38,17 @@ export default function RookiesList() {
             {players.filter(p => p.isPlayer).map(p => (
               <tr key={p.id}>
                 <td>
-                  <Link to={`/rookies/${p.id}`}>{p.name}</Link>
-                  {p.isBrownsStarter && <i className="fa fa-star text-warning ms-2" title="Browns starter"/>}
+                  <div className="d-flex align-items-center gap-2">
+                    {p.photoUrl && <img src={p.photoUrl} alt="" style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4 }} />}
+                    <Link to={`/rookies/${p.id}`}>{p.name}</Link>
+                  </div>
                 </td>
-                <td>{p.team}</td>
+                <td>
+                  <div className="d-flex align-items-center gap-2">
+                    {teamFor(p.team)?.helmetUrl && <img src={teamFor(p.team)!.helmetUrl} alt="" style={{ width: 28, height: 18 }} />}
+                    <span title={teamFor(p.team)?.name || p.team}>{p.team}</span>
+                  </div>
+                </td>
                 <td>{p.position}</td>
                 <td className="text-end">
                   <div className="btn-group btn-group-sm">
